@@ -5,7 +5,7 @@
 1. 下载发布包：  
    - 方式 1：直接下载仓库里的 `publish` 文件夹  
    - 方式 2：从 [Releases](https://github.com/ying-jun-wei-wu-de-majiale/genshintool/releases) 下载 `v1.0` 版本  
-
+   - 方式 3(推荐):右侧release可以直接下载压缩包
 2. 安装运行：  
    双击 `publish` 文件夹里的 `setup.exe`，按提示完成安装，桌面会生成程序快捷方式，点击即可打开窗口。  
 
