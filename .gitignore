@@ -1,0 +1,7 @@
+# Visual Studio 项目忽略规则
+.vs/                
+bin/              
+obj/               
+*.suo             
+*.user            
+*.sln.docstates   
