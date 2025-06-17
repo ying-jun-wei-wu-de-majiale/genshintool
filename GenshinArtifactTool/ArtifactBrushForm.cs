@@ -11,6 +11,10 @@ namespace GenshinArtifactTool
     {
         // 圣遗物部位类型
         private readonly string[] artifactPositions = { "时之沙", "死之羽", "生之花", "空之杯", "理之冠" };
+        // 存储圣遗物图片的字典，键为圣遗物类型，值为对应图片
+        private Dictionary<string, Image> artifactImages = new Dictionary<string, Image>();
+        // 当前显示的圣遗物类型
+        private string currentArtifactType = null;
         private InventoryForm inventoryForm;
         // 副词条可能的属性
         private readonly string[] substats = {
@@ -19,8 +23,6 @@ namespace GenshinArtifactTool
             "攻击力", "防御力", "生命值"
         };
         private Form1 mainForm;
-        // 存储所有圣遗物图片的列表
-        private List<Image> artifactImages = new List<Image>();
         // 当前显示的圣遗物索引
         private int currentIndex = 0;
         // 圣遗物图片控件
@@ -103,24 +105,10 @@ namespace GenshinArtifactTool
             artifactPictureBox.Size = new Size(200, 200);
             artifactPictureBox.SizeMode = PictureBoxSizeMode.Zoom;
             artifactPictureBox.BackColor = Color.White;
-            artifactPictureBox.Click += ArtifactPictureBox_Click;
             artifactPictureBox.BorderStyle = BorderStyle.FixedSingle;
             mainPanel.Controls.Add(artifactPictureBox);
 
-            // 创建左右箭头按钮
-            btnLeft = new Button();
-            btnLeft.Text = "<";
-            btnLeft.Font = new Font("Arial", 20, FontStyle.Bold);
-            btnLeft.Size = new Size(50, 50);
-            btnLeft.Click += BtnLeft_Click;
-            mainPanel.Controls.Add(btnLeft);
 
-            btnRight = new Button();
-            btnRight.Text = ">";
-            btnRight.Font = new Font("Arial", 20, FontStyle.Bold);
-            btnRight.Size = new Size(50, 50);
-            btnRight.Click += BtnRight_Click;
-            mainPanel.Controls.Add(btnRight);
 
             // 创建属性标签
             for (int i = 0; i < 6; i++)
@@ -171,9 +159,6 @@ namespace GenshinArtifactTool
             // 设置图片位置
             artifactPictureBox.Location = new Point(imageX, imageY);
 
-            // 设置左右箭头位置
-            btnLeft.Location = new Point(imageX - 30 - btnLeft.Width, imageY + (imageHeight - btnLeft.Height) / 2);
-            btnRight.Location = new Point(imageX + imageWidth + 30, imageY + (imageHeight - btnRight.Height) / 2);
 
             // 设置属性标签位置
             int propertyX = centerX - 250; // 标签宽度的一半
@@ -203,54 +188,65 @@ namespace GenshinArtifactTool
             mainPanel.AutoScrollMinSize = new Size(0, totalHeight);
         }
 
- 
+
         // 加载圣遗物图片
+        // 在LoadArtifactImages方法中添加调试输出
         private void LoadArtifactImages()
         {
-            // 这里应该从资源或文件加载实际的圣遗物图片
-            for (int i = 1; i <= 10; i++)
+            try
             {
-                artifactImages.Add(Properties.Resources.artifact_placeholder);
-            }
-
-            // 显示第一张图片
-            if (artifactImages.Count > 0)
-            {
-                artifactPictureBox.Image = artifactImages[currentIndex];
-            }
-        }
-
-        // 左箭头点击事件
-        private void BtnLeft_Click(object sender, EventArgs e)
-        {
-            if (artifactImages.Count == 0) return;
-
-            currentIndex = (currentIndex - 1 + artifactImages.Count) % artifactImages.Count;
-            artifactPictureBox.Image = artifactImages[currentIndex];
-        }
-
-        // 右箭头点击事件
-        private void BtnRight_Click(object sender, EventArgs e)
-        {
-            if (artifactImages.Count == 0) return;
-
-            currentIndex = (currentIndex + 1) % artifactImages.Count;
-            artifactPictureBox.Image = artifactImages[currentIndex];
-        }
-
-        // 圣遗物图片点击事件
-        private void ArtifactPictureBox_Click(object sender, EventArgs e)
-        {
-            // 创建并显示圣遗物选择对话框
-            using (ArtifactSelectionForm selectionForm = new ArtifactSelectionForm(artifactImages, currentIndex))
-            {
-                if (selectionForm.ShowDialog() == DialogResult.OK)
+                foreach (string position in artifactPositions)
                 {
-                    currentIndex = selectionForm.SelectedIndex;
-                    artifactPictureBox.Image = artifactImages[currentIndex];
+                    Image image = GetImageByPosition(position);
+                    if (image != null)
+                    {
+                        artifactImages[position] = image;
+                        Console.WriteLine($"成功加载图片: {position}"); // 调试输出
+                    }
+                    else
+                    {
+                        artifactImages[position] = Properties.Resources.artifact_placeholder;
+                        Console.WriteLine($"未找到图片: {position}，使用默认图片"); // 调试输出
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"加载圣遗物图片时出错: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
+ 
+        private Image GetImageByPosition(string position)
+        {
+            try
+            {
+                // 根据资源名称直接获取
+                switch (position)
+                {
+                    case "生之花":
+                        return Properties.Resources.生之花;
+                    case "死之羽":
+                        return Properties.Resources.死之羽;
+                    case "时之沙":
+                        return Properties.Resources.时之沙;
+                    case "空之杯":
+                        return Properties.Resources.空之杯;
+                    case "理之冠":
+                        return Properties.Resources.理之冠;
+                    default:
+                        return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"获取图片 {position} 时出错: {ex.Message}");
+                return null;
+            }
+        }
+
+
+
 
         // 获取按钮点击事件
         private void BtnGet_Click(object sender, EventArgs e)
@@ -290,7 +286,7 @@ namespace GenshinArtifactTool
 
             // 随机选择圣遗物部位
             currentPosition = artifactPositions[random.Next(artifactPositions.Length)];
-
+            currentArtifactType = currentPosition; // 记录当前圣遗物类型
             // 根据部位确定主词条
             switch (currentPosition)
             {
@@ -305,7 +301,8 @@ namespace GenshinArtifactTool
                     mainStat = sandsStats[random.Next(sandsStats.Length)];
                     break;
                 case "空之杯":
-                    string[] gobletStats = { "攻击力百分比", "防御力百分比", "生命值百分比", "元素伤害加成百分比", "物理伤害加成百分比", "元素精通" };
+                    string[] gobletStats = { "攻击力百分比", "防御力百分比", "生命值百分比", "风元素伤害加成", "物理伤害加成百分比",
+                        "元素精通","火元素伤害加成", "雷元素伤害加成", "水元素伤害加成","冰元素伤害加成","草元素伤害加成", "岩元素伤害加成",};
                     mainStat = gobletStats[random.Next(gobletStats.Length)];
                     break;
                 case "理之冠":
@@ -334,8 +331,20 @@ namespace GenshinArtifactTool
                 subStats.Add(availableSubstats[index]);
                 availableSubstats.RemoveAt(index);
             }
+            UpdateArtifactImage();
         }
-
+        private void UpdateArtifactImage()
+        {
+            if (currentArtifactType != null && artifactImages.ContainsKey(currentArtifactType))
+            {
+                artifactPictureBox.Image = artifactImages[currentArtifactType];
+            }
+            else
+            {
+                // 显示默认图片
+                artifactPictureBox.Image = Properties.Resources.artifact_placeholder;
+            }
+        }
         public (string position, string mainStat, List<string> subStats) GetCurrentArtifact()
         {
             return (currentPosition, mainStat, new List<string>(subStats));

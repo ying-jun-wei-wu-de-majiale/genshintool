@@ -7,6 +7,10 @@ namespace GenshinArtifactTool
 {
     public partial class ArtifactUpgradeForm : Form
     {
+        // 圣遗物部位类型
+        private readonly string[] artifactPositions = { "时之沙", "死之羽", "生之花", "空之杯", "理之冠" };
+        // 存储圣遗物图片的字典
+        private Dictionary<string, Image> artifactImages = new Dictionary<string, Image>();
         private string _position;
         private string _mainStat;
         private List<string> _subStats;
@@ -28,12 +32,66 @@ namespace GenshinArtifactTool
         {
             InitializeComponent();
             InitializeUI(); // 确保UI始终初始化
+            LoadArtifactImages(); // 加载图片资源
         }
 
+        private void LoadArtifactImages()
+        {
+            try
+            {
+                // 为每种圣遗物类型加载对应的图片
+                foreach (string position in artifactPositions)
+                {
+                    Image image = GetImageByPosition(position);
+                    if (image != null)
+                    {
+                        artifactImages[position] = image;
+                    }
+                    else
+                    {
+                        // 如果找不到对应图片，使用默认图片
+                        artifactImages[position] = Properties.Resources.artifact_placeholder;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"加载圣遗物图片时出错: {ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        private Image GetImageByPosition(string position)
+        {
+            try
+            {
+                // 直接从资源获取（避免反射问题）
+                switch (position)
+                {
+                    case "生之花":
+                        return Properties.Resources.生之花;
+                    case "死之羽":
+                        return Properties.Resources.死之羽;
+                    case "时之沙":
+                        return Properties.Resources.时之沙;
+                    case "空之杯":
+                        return Properties.Resources.空之杯;
+                    case "理之冠":
+                        return Properties.Resources.理之冠;
+                    default:
+                        return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"获取图片 {position} 时出错: {ex.Message}");
+                return null;
+            }
+        }
         public ArtifactUpgradeForm(string position, string mainStat, List<string> subStats)
         {
             InitializeComponent();
-            InitializeUI(); // 确保UI始终初始化
+            InitializeUI();
+            LoadArtifactImages(); // 加载图片资源
 
             // 初始化数据
             _position = position;
@@ -42,12 +100,42 @@ namespace GenshinArtifactTool
 
             InitializeSubStats();
             UpdateUI();
+            SetArtifactImage(position); // 设置图片
         }
+        private void SetArtifactImage(string position)
+        {
+            if (artifactImages.ContainsKey(position))
+            {
+                artifactImage.Image = artifactImages[position];
+            }
+            else
+            {
+                artifactImage.Image = Properties.Resources.artifact_placeholder;
+            }
 
+            // 更新图片位置
+            UpdateArtifactImagePosition();
+        }
+        // 添加图片位置更新方法
+        private void UpdateArtifactImagePosition()
+        {
+            if (mainLayoutPanel != null && artifactImage != null)
+            {
+                // 计算居中位置
+                int centerX = (mainLayoutPanel.Width - artifactImage.Width) / 2;
+                int centerY = (mainLayoutPanel.GetRowHeights()[0] - artifactImage.Height) / 2;
+
+                // 设置图片位置
+                artifactImage.Location = new Point(centerX, centerY);
+            }
+        }
         private void ArtifactUpgradeForm_Resize(object sender, EventArgs e)
         {
             // 窗口大小变化时更新UI布局
             UpdateButtonLayout();
+
+            // 同时更新图片位置
+            UpdateArtifactImagePosition();
         }
 
         // 添加布局更新方法
@@ -80,7 +168,7 @@ namespace GenshinArtifactTool
             { "生命值百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
             { "元素充能效率", new float[] { 4.5f, 5.2f, 5.8f, 6.5f } },
             { "元素精通", new float[] { 16, 19, 21, 23 } },
-            { "暴击率", new float[] { 2.7f, 2.1f, 2.5f, 2.8f } },
+            { "暴击率", new float[] { 2.7f, 3.1f, 3.5f, 3.9f } },
             { "暴击伤害", new float[] { 5.4f, 6.2f, 7.0f, 7.8f } },
             { "攻击力", new float[] { 14, 16, 18, 19 } },
             { "防御力", new float[] { 16, 19, 21, 23 } },
@@ -133,7 +221,7 @@ namespace GenshinArtifactTool
             mainLayoutPanel = new TableLayoutPanel();
             mainLayoutPanel.Dock = DockStyle.Fill;
             mainLayoutPanel.ColumnCount = 1; // 简化为单栏布局，更易管理
-            mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
+            mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 200F));
             mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
             mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
             mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
@@ -143,8 +231,9 @@ namespace GenshinArtifactTool
             artifactImage = new PictureBox();
             artifactImage.BackColor = Color.White;
             artifactImage.BorderStyle = BorderStyle.FixedSingle;
-            artifactImage.SizeMode = PictureBoxSizeMode.Zoom;
+            artifactImage.SizeMode = PictureBoxSizeMode.Zoom; // 保持缩放模式
             artifactImage.Anchor = AnchorStyles.None; // 居中锚定
+            artifactImage.Size = new Size(200, 200); // 
             mainLayoutPanel.Controls.Add(artifactImage, 0, 0);
 
             // 居中图片框的替代方法
@@ -509,6 +598,7 @@ namespace GenshinArtifactTool
             if (mainLayoutPanel == null)
             {
                 InitializeUI();
+                LoadArtifactImages(); // 加载图片资源
             }
 
             // 重置所有相关变量
@@ -534,6 +624,9 @@ namespace GenshinArtifactTool
 
             // 更新窗口标题
             this.Text = $"升级 {position}";
+
+            // 设置图片
+            SetArtifactImage(position);
         }
 
         // 检查是否是扩展词条的等级
