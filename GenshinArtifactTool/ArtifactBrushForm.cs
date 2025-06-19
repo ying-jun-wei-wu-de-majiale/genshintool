@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using GenshinArtifactTool;
 
 namespace GenshinArtifactTool
 {
+
     public partial class ArtifactBrushForm : Form
     {
+        public Form1 MainForm { get; set; }
         // 引用数据管理器单例
         private readonly ArtifactDataManager _dataManager = ArtifactDataManager.Instance;
 
@@ -47,6 +50,26 @@ namespace GenshinArtifactTool
             InitializeUI();
             LoadArtifactImages();
             this.Resize += ArtifactBrushForm_Resize;
+        }
+        public event EventHandler<UpgradeRequestedEventArgs> UpgradeRequested;
+
+        // 触发事件的方法示例
+        private void OnUpgradeRequested(string position, string mainStat, List<string> subStats)
+        {
+            UpgradeRequested?.Invoke(this, new UpgradeRequestedEventArgs(position, mainStat, subStats));
+        }
+        public class UpgradeRequestedEventArgs : EventArgs
+        {
+            public string Position { get; set; }
+            public string MainStat { get; set; }
+            public List<string> SubStats { get; set; }
+
+            public UpgradeRequestedEventArgs(string position, string mainStat, List<string> subStats)
+            {
+                Position = position;
+                MainStat = mainStat;
+                SubStats = subStats;
+            }
         }
         private void ArtifactBrushForm_Resize(object sender, EventArgs e)
         {
@@ -282,10 +305,19 @@ namespace GenshinArtifactTool
                     return;
                 }
 
-                // 打开升级界面并传递圣遗物（这里简化为传递第一个圣遗物）
+                // 获取要升级的圣遗物
                 var artifactToUpgrade = allArtifacts[0];
-                var upgradeForm = new ArtifactUpgradeForm(artifactToUpgrade);
-                upgradeForm.Show(this);
+
+                // 通过MainForm访问升级窗体和TabControl
+                if (this.MainForm != null)
+                {
+                    // 调用主窗体的方法来处理升级
+                    this.MainForm.ShowArtifactUpgrade(
+                        artifactToUpgrade.Position,
+                        artifactToUpgrade.MainStat,
+                        artifactToUpgrade.SubStats
+                    );
+                }
             }
             catch (Exception ex)
             {

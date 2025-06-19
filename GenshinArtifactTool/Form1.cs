@@ -67,11 +67,31 @@ namespace GenshinArtifactTool
                 SwitchToTab("圣遗物升级");
             }
         }
-        private void InitializeArtifactBrushForm()
+        public void ShowArtifactUpgrade(string position, string mainStat, List<string> subStats)
         {
-            artifactBrushForm = new ArtifactBrushForm();
-            artifactBrushForm.MainForm = this;
-            AddFormToTabPage(artifactBrushForm, "刷圣遗物");
+            // 确保升级窗体已初始化
+            if (artifactUpgradeForm == null || artifactUpgradeForm.IsDisposed)
+            {
+                artifactUpgradeForm = new ArtifactUpgradeForm(position, mainStat, subStats)
+                {
+                    TopLevel = false,
+                    FormBorderStyle = FormBorderStyle.None,
+                    Dock = DockStyle.Fill
+                };
+
+                // 添加到TabPage
+                var tabPage = new TabPage("圣遗物升级");
+                tabPage.Controls.Add(artifactUpgradeForm);
+                tabControl.TabPages.Add(tabPage);
+            }
+            else
+            {
+                // 更新现有窗体数据
+                artifactUpgradeForm.SetArtifactData(position, mainStat, subStats);
+            }
+
+            // 切换到升级标签页
+            SwitchToTab("圣遗物升级");
         }
         private void btnArtifactBrush_Click(object sender, EventArgs e)
         {
@@ -93,25 +113,13 @@ namespace GenshinArtifactTool
         }
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            try
-            {
-                if (artifactBrushForm != null && !artifactBrushForm.IsDisposed)
-                {
-                    artifactBrushForm.Dispose();
-                }
-                // 其他窗体的释放操作...
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"释放资源时发生错误: {ex.Message}", "错误");
-            }
-
+            artifactBrushForm?.Dispose();
+            artifactUpgradeForm?.Dispose();
+            inventoryForm?.Dispose();
+            artifactSelectionForm?.Dispose();
             base.OnFormClosing(e);
         }
-        private void InitializeArtifactUpgradeForm()
-        {
-            artifactUpgradeForm = new ArtifactUpgradeForm();
-        }
+
         private void InitializeFeatureForms()
         {
             inventoryForm = new InventoryForm();
@@ -172,14 +180,14 @@ namespace GenshinArtifactTool
                 tabControl.SelectedIndex = 0;
             }
         }
-        private void SwitchToTab(string tabText)
+        public void SwitchToTab(string tabText)
         {
-            for (int i = 0; i < tabControl.TabPages.Count; i++)
+            foreach (TabPage tab in tabControl.TabPages)
             {
-                if (tabControl.TabPages[i].Text == tabText)
+                if (tab.Text == tabText)
                 {
-                    tabControl.SelectedIndex = i;
-                    return;
+                    tabControl.SelectedTab = tab;
+                    break;
                 }
             }
         }

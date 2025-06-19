@@ -9,6 +9,7 @@ namespace GenshinArtifactTool
 {
     public partial class ArtifactSelectionForm : Form
     {
+        public Form1 MainForm { get; set; }
         // 类成员声明
         private CheckBox[] chkSubstats = new CheckBox[10];
         private readonly string[] artifactPositions = { "时之沙", "死之羽", "生之花", "空之杯", "理之冠" };

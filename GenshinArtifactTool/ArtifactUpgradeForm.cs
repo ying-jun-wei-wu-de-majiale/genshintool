@@ -7,6 +7,7 @@ namespace GenshinArtifactTool
 {
     public partial class ArtifactUpgradeForm : Form
     {
+        public Form1 MainForm { get; set; }
         // 圣遗物部位类型
         private readonly string[] artifactPositions = { "时之沙", "死之羽", "生之花", "空之杯", "理之冠" };
         // 存储圣遗物图片的字典

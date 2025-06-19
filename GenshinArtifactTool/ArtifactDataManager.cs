@@ -1,18 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using static InventoryForm;
+using GenshinArtifactTool;
 
 // 圣遗物数据管理器（单例模式）
 public sealed class ArtifactDataManager
 {
-    public class Artifact
-    {
-        public string Id { get; set; } = Guid.NewGuid().ToString(); // 添加唯一标识
-        public string Position { get; set; } // 部位
-        public string MainStat { get; set; } // 主词条
-        public List<string> SubStats { get; set; } // 副词条
-                                                   // 其他属性...
-    }
+
     // 私有静态实例，使用Lazy<T>实现线程安全的延迟初始化
     private static readonly Lazy<ArtifactDataManager> _instance =
         new Lazy<ArtifactDataManager>(() => new ArtifactDataManager());

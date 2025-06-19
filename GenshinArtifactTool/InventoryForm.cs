@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using GenshinArtifactTool;
 
 public partial class InventoryForm : Form
 {
@@ -395,11 +396,5 @@ public partial class InventoryForm : Form
         });
         // ...添加更多测试数据
     }
-    public class Artifact
-    {
-        public string Position { get; set; } // 部位
-        public string MainStat { get; set; } // 主词条
-        public List<string> SubStats { get; set; } // 副词条
-                                                   // 可以添加更多属性...
-    }
+
 }
