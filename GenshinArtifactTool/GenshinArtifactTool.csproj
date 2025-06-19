@@ -23,7 +23,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>2</ApplicationRevision>
+    <ApplicationRevision>3</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -75,12 +75,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Artifact.cs" />
     <Compile Include="ArtifactBrushForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="ArtifactBrushForm.Designer.cs">
       <DependentUpon>ArtifactBrushForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="ArtifactDataManager.cs" />
     <Compile Include="ArtifactSelectionForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -93,12 +95,6 @@
     <Compile Include="ArtifactUpgradeForm.Designer.cs">
       <DependentUpon>ArtifactUpgradeForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="CustomArtifactForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="CustomArtifactForm.Designer.cs">
-      <DependentUpon>CustomArtifactForm.cs</DependentUpon>
-    </Compile>
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -107,9 +103,6 @@
     </Compile>
     <Compile Include="InventoryForm.cs">
       <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="InventoryForm.Designer.cs">
-      <DependentUpon>InventoryForm.cs</DependentUpon>
     </Compile>
     <Compile Include="InventoryManager.cs" />
     <Compile Include="Program.cs" />
@@ -132,6 +125,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="InventoryForm.resx">
+      <DependentUpon>InventoryForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

@@ -9,7 +9,6 @@ namespace GenshinArtifactTool
         /// 必需的设计器变量。
         /// </summary>
         private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.Button btnArtifactBrush;
         private System.Windows.Forms.Button btnArtifactUpgrade;
         private System.Windows.Forms.Button btnInventory;
         /// <summary>
@@ -52,25 +51,33 @@ namespace GenshinArtifactTool
 
         #endregion
 
-      
+
 
         private void InitializeAllForms()
         {
-            // 初始化刷圣遗物界面
+            // 初始化所有功能窗体
+            inventoryForm = new InventoryForm();
+            inventoryForm.MainForm = this;
+
+            // 刷圣遗物界面
             artifactBrushForm = new ArtifactBrushForm();
             artifactBrushForm.MainForm = this;
+            artifactBrushForm.SetInventoryForm(inventoryForm);
 
-            // 初始化升级界面
+            // 圣遗物升级界面
             artifactUpgradeForm = new ArtifactUpgradeForm();
+            artifactUpgradeForm.TopLevel = false;
+            artifactUpgradeForm.FormBorderStyle = FormBorderStyle.None;
 
-            // 初始化自定义界面
-            customArtifactForm = new CustomArtifactForm();
+            // 祝圣之霜界面 - 关键初始化
+            artifactSelectionForm = new ArtifactSelectionForm();
+            artifactSelectionForm.TopLevel = false;
+            artifactSelectionForm.FormBorderStyle = FormBorderStyle.None;
 
-            // 初始化背包界面
-            inventoryForm = new InventoryForm();
+            // 其他窗体初始化...
         }
-  
-       
+
+
 
     }
 }

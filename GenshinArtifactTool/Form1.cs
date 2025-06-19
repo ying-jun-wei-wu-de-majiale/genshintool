@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using GenshinArtifactTool;
 using System.Windows.Forms;
 using static GenshinArtifactTool.ArtifactBrushForm;
 
@@ -15,7 +16,7 @@ namespace GenshinArtifactTool
         // 功能界面
         private ArtifactBrushForm artifactBrushForm;
         private ArtifactUpgradeForm artifactUpgradeForm;
-        private CustomArtifactForm customArtifactForm;
+        
         private InventoryForm inventoryForm;
         public TabControl tabControl;
        
@@ -114,7 +115,7 @@ namespace GenshinArtifactTool
         private void InitializeFeatureForms()
         {
             inventoryForm = new InventoryForm();
-            inventoryForm.MainForm = this;
+            inventoryForm.MainForm = this;//117行
 
             // 使用无参构造函数创建 ArtifactBrushForm
             artifactBrushForm = new ArtifactBrushForm();
@@ -128,20 +129,16 @@ namespace GenshinArtifactTool
                 FormBorderStyle = FormBorderStyle.None
             };
 
-            customArtifactForm = new CustomArtifactForm();
+            
 
             // 添加到 TabControl
             AddFormToTabPage(artifactBrushForm, "刷圣遗物");
             AddFormToTabPage(artifactUpgradeForm, "圣遗物升级");
-            AddFormToTabPage(customArtifactForm, "自定义圣遗物");
+            AddFormToTabPage(artifactSelectionForm, "祝圣之霜");
             AddFormToTabPage(inventoryForm, "背包");
 
             // 确保 TabControl 可见
             
-        }
-        private void InitializeCustomArtifactForm()
-        {
-            customArtifactForm = new CustomArtifactForm();
         }
 
         private void InitializeInventoryForm()
@@ -152,6 +149,8 @@ namespace GenshinArtifactTool
         {
             get { return artifactUpgradeForm; }
         }
+        public ArtifactSelectionForm artifactSelectionForm { get; set; }
+
         // 添加默认标签页
         private void AddDefaultTabPages()
         {
@@ -161,8 +160,8 @@ namespace GenshinArtifactTool
             // 圣遗物升级标签页
             AddFormToTabPage(artifactUpgradeForm, "圣遗物升级");
 
-            // 自定义圣遗物标签页
-            AddFormToTabPage(customArtifactForm, "自定义圣遗物");
+            // 祝圣之霜标签页
+            AddFormToTabPage(artifactSelectionForm, "祝圣之霜");
 
             // 背包标签页
             AddFormToTabPage(inventoryForm, "背包");
@@ -268,21 +267,7 @@ namespace GenshinArtifactTool
                 this.StartPosition = FormStartPosition.CenterScreen;
                 this.Text = "原神圣遗物工具";
 
-                //tabControlMain = new TabControl();
-                //tabControlMain.Dock = DockStyle.Fill;
-                //this.Controls.Add(tabControlMain);
 
-                //InitializeAllForms();
-
-                //// 先添加标签页，再显示
-                //AddTabPage(artifactBrushForm, "刷圣遗物");
-                //AddTabPage(artifactUpgradeForm, "圣遗物升级");
-                //AddTabPage(customArtifactForm, "自定义圣遗物");
-                //AddTabPage(inventoryForm, "背包");
-
-                //Console.WriteLine("所有标签页添加完成，共" + tabControlMain.TabCount + "个标签页");
-
-                //tabControlMain.Visible = true; // 显式设置
 
             }
             catch (Exception ex)
@@ -744,10 +729,35 @@ namespace GenshinArtifactTool
             artifactUpgradeForm.Show();
         }
 
-        // 自定义圣遗物按钮点击事件
+        // 祝圣之霜按钮点击事件
         private void btnCustomArtifact_Click(object sender, EventArgs e)
         {
-           
+            // 确保祝圣之霜界面已初始化
+            if (artifactSelectionForm == null || artifactSelectionForm.IsDisposed)
+            {
+                artifactSelectionForm = new ArtifactSelectionForm();
+                artifactSelectionForm.TopLevel = false;
+                artifactSelectionForm.FormBorderStyle = FormBorderStyle.None;
+                artifactSelectionForm.Dock = DockStyle.Fill;
+
+                // 创建标签页并添加窗体
+                TabPage tabPage = new TabPage("祝圣之霜");
+                tabPage.Controls.Add(artifactSelectionForm);
+                tabControl.TabPages.Add(tabPage);
+            }
+
+            // 切换到祝圣之霜标签页
+            for (int i = 0; i < tabControl.TabPages.Count; i++)
+            {
+                if (tabControl.TabPages[i].Text == "祝圣之霜")
+                {
+                    tabControl.SelectedIndex = i;
+                    break;
+                }
+            }
+
+            // 确保窗体可见
+            artifactSelectionForm.Show();
         }
         // 在Form1.cs中修改创建ArtifactBrushForm的代码
 
