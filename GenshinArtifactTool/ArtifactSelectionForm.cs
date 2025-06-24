@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using static GenshinArtifactTool.Artifact;
 
 namespace GenshinArtifactTool
 {
@@ -18,7 +19,8 @@ namespace GenshinArtifactTool
             { "时之沙", new string[] { "攻击力百分比", "防御力百分比", "生命值百分比", "元素充能效率", "元素精通" } },
             { "死之羽", new string[] { "攻击力" } },
             { "生之花", new string[] { "生命值" } },
-            { "空之杯", new string[] { "攻击力百分比", "防御力百分比", "生命值百分比", "元素伤害加成百分比", "物理伤害加成百分比", "元素精通" } },
+            { "空之杯", new string[] { "攻击力百分比", "防御力百分比", "生命值百分比",  "风元素伤害加成", "火元素伤害加成",
+                         "水元素伤害加成", "雷元素伤害加成", "冰元素伤害加成", "草元素伤害加成", "岩元素伤害加成", "物理伤害加成", "元素精通" } },
             { "理之冠", new string[] { "攻击力百分比", "防御力百分比", "生命值百分比", "暴击率", "暴击伤害", "治疗加成", "元素精通" } }
         };
         private readonly string[] substats = {
@@ -31,6 +33,9 @@ namespace GenshinArtifactTool
         private string selectedMainStat = "";
         private List<string> selectedSubstats = new List<string>();
         private List<string> generatedSubstats = new List<string>();
+        // 替换原有的 generatedSubstats 定义
+        private List<string> selectedSubstatNames = new List<string>();  // 只存储选中的属性名
+        private Dictionary<string, float> allSubstatValues = new Dictionary<string, float>(); // 最终所有副词条及值
         private Random random = new Random();
         private const int MAX_SELECTED_SUBSTATS = 2;
         //计数器
@@ -170,7 +175,7 @@ namespace GenshinArtifactTool
             //==== 4. 副词条选择（居中 + 3列布局） ====
             var substatsGroup = new GroupBox
             {
-                Text = "副词条选择 (最多选2个)",
+                Text = "选择2个副词条",
                 Font = new Font("微软雅黑", 10F),
                 Width = 550,
                 Height =140,
@@ -215,10 +220,10 @@ namespace GenshinArtifactTool
             CenterControl(substatsGroup, substatsContainer);
             mainTable.Controls.Add(substatsContainer, 0, 3);
 
-            //==== 5. 生成的副词条（居中） ====
+            //==== 5. 生-成的副词条（居中） ====
             var generatedGroup = new GroupBox
             {
-                Text = "生成的副词条",
+                Text = "当前副词条",
                 Font = new Font("微软雅黑", 10F),
                 Width = 320,
                 Height = 120,
@@ -429,9 +434,10 @@ namespace GenshinArtifactTool
                 chkSubstats[i].Enabled = true;
             }
 
-            selectedSubstats.Clear();
-            generatedSubstats.Clear();
+            selectedSubstatNames.Clear();
+            allSubstatValues.Clear();
             lbGeneratedSubstats.Items.Clear();
+            btnConfirm.Enabled = false;
         }
 
         private void LoadArtifactImages()
@@ -473,127 +479,150 @@ namespace GenshinArtifactTool
             CheckBox chk = sender as CheckBox;
             if (chk == null) return;
 
-            // 如果还没有选择主词条，不允许选择副词条
             if (string.IsNullOrEmpty(selectedMainStat))
             {
                 chk.Checked = false;
                 return;
             }
 
-            // 更新已选副词条列表
             if (chk.Checked)
             {
-                if (!selectedSubstats.Contains(chk.Text))
+                if (selectedSubstatNames.Count < 2)
                 {
-                    selectedSubstats.Add(chk.Text);
+                    selectedSubstatNames.Add(chk.Text);
+                }
+                else
+                {
+                    chk.Checked = false;
+                    return;
                 }
             }
             else
             {
-                if (selectedSubstats.Contains(chk.Text))
-                {
-                    selectedSubstats.Remove(chk.Text);
-                }
+                selectedSubstatNames.Remove(chk.Text);
             }
 
-            // 限制最多选择2个副词条
-            if (selectedSubstats.Count >= MAX_SELECTED_SUBSTATS)
-            {
-                foreach (CheckBox box in chkSubstats)
-                {
-                    if (!box.Checked && box.Enabled)
-                    {
-                        box.Enabled = false;
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < substats.Length; i++)
-                {
-                    if (substats[i] != selectedMainStat && !selectedSubstats.Contains(substats[i]))
-                    {
-                        chkSubstats[i].Enabled = true;
-                    }
-                }
-            }
+            // 更新按钮状态
+            btnConfirm.Enabled = selectedSubstatNames.Count == 2;
 
-           
+            // 更新显示（只显示属性名）
+            UpdateSubstatsDisplay();
         }
 
-        private void GenerateRemainingSubstats()
+        private float GetRandomSubstatValue(string substat)
         {
-            if (lbGeneratedSubstats == null) return;
+            // 定义每种属性的可能值范围
+            var valueRanges = new Dictionary<string, float[]>()
+    {
+    { "攻击力百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
+    { "防御力百分比", new float[] { 5.1f, 5.8f, 6.6f, 7.3f } },
+    { "生命值百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
+    { "元素充能效率", new float[] { 4.5f, 5.2f, 5.8f, 6.5f } },
+    { "元素精通", new float[] { 16, 19, 21, 23 } },
+    { "暴击率", new float[] { 2.7f, 3.1f, 3.5f, 3.9f } },
+    { "暴击伤害", new float[] { 5.4f, 6.2f, 7.0f, 7.8f } },
+    { "攻击力", new float[] { 14, 16, 18, 19 } },
+    { "防御力", new float[] { 16, 19, 21, 23 } },
+    { "生命值", new float[] { 209, 239, 269, 299 } }
+    };
 
-            lbGeneratedSubstats.Items.Clear();
-            generatedSubstats.Clear();
-
-            if (selectedSubstats.Count >= 2)
+            if (valueRanges.TryGetValue(substat, out var values))
             {
-                // 获取可用的副词条(排除已选的和主词条)
-                var available = substats.Except(selectedSubstats)
-                                      .Where(s => s != selectedMainStat)
-                                      .ToList();
+                return values[random.Next(values.Length)];
+            }
+            return 0f;
+        }
 
-                // 确定要生成的数量 (1-2条)
-                int totalSubstats = random.Next(3, 5); // 初始3-4条副词条
-                int toGenerate = totalSubstats - selectedSubstats.Count;
+   
 
-                // 随机生成需要的数量
-                for (int i = 0; i < Math.Min(toGenerate, available.Count); i++)
-                {
-                    int index = random.Next(available.Count);
-                    generatedSubstats.Add(available[index]);
-                    available.RemoveAt(index);
-                }
+        private void UpdateSubstatsDisplay()
+        {
+            lbGeneratedSubstats.Items.Clear();
 
-                // 更新显示
-                foreach (var stat in generatedSubstats)
-                {
-                    lbGeneratedSubstats.Items.Add(stat);
-                }
-
-                // 显示提示信息
-                if (generatedSubstats.Count < (totalSubstats - selectedSubstats.Count))
-                {
-                    MessageBox.Show($"由于属性限制，只生成了{generatedSubstats.Count}条副词条",
-                                  "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+            // 只显示选中的属性名（不显示值）
+            foreach (var stat in selectedSubstatNames)
+            {
+                lbGeneratedSubstats.Items.Add(stat);
             }
         }
 
+        private string GetSubstatUnit(string substat)
+        {
+            return substat.Contains("百分比") || substat.Contains("率") || substat.Contains("伤害") ? "%" : "";
+        }
         private void BtnConfirm_Click(object sender, EventArgs e)
         {
-            // 验证选择
-            if (string.IsNullOrEmpty(selectedPosition))
+            if (selectedSubstatNames.Count < 2) return;
+
+            // 1. 为已选属性生成值
+            allSubstatValues.Clear();
+            foreach (var stat in selectedSubstatNames)
             {
-                MessageBox.Show("请选择圣遗物类型", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                allSubstatValues[stat] = GetRandomSubstatValue(stat);
             }
 
-            if (string.IsNullOrEmpty(selectedMainStat))
+            // 2. 生成剩余副词条(1-2条)
+            var available = substats.Except(selectedSubstatNames)
+                                 .Where(s => s != selectedMainStat)
+                                 .ToList();
+
+            int toGenerate = random.Next(1, 3); // 随机1-2条
+            for (int i = 0; i < Math.Min(toGenerate, available.Count); i++)
             {
-                MessageBox.Show("请选择主词条", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                int index = random.Next(available.Count);
+                string substat = available[index];
+                allSubstatValues[substat] = GetRandomSubstatValue(substat);
+                available.RemoveAt(index);
             }
 
-            if (selectedSubstats.Count < 2)
-            {
-                MessageBox.Show("请至少选择2个副词条", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            // 3. 更新显示完整信息
+            ShowFinalSubstats();
 
-            // 生成剩余副词条
-            GenerateRemainingSubstats();
+            // 4. 创建圣遗物对象
+            var newArtifact = CreateArtifactWithValues();
 
-            // 增加消耗计数
+            // 5. 添加到数据管理器
+            ArtifactDataManager.Instance.AddArtifact(newArtifact);
+
+            // 重置UI
             consumedCount++;
             lblConsumedCount.Text = $"已消耗祝圣之霜：{consumedCount}";
-
-            // 可选：播放音效或动画
             System.Media.SystemSounds.Beep.Play();
         }
 
+        private void ShowFinalSubstats()
+        {
+            lbGeneratedSubstats.Items.Clear();
+            foreach (var kvp in allSubstatValues)
+            {
+                string unit = GetSubstatUnit(kvp.Key);
+                string valueStr = unit == "%" ? $"{kvp.Value:F1}{unit}" : $"{(int)kvp.Value}{unit}";
+                lbGeneratedSubstats.Items.Add($"{kvp.Key}: {valueStr}");
+            }
+        }
+
+        private Artifact CreateArtifactWithValues()
+        {
+            var substatStrings = new List<string>();
+            foreach (var kvp in allSubstatValues)
+            {
+                string unit = GetSubstatUnit(kvp.Key);
+                string valueStr = unit == "%" ? $"{kvp.Value:F1}{unit}" : $"{(int)kvp.Value}{unit}";
+                substatStrings.Add($"{kvp.Key}: {valueStr}");
+            }
+
+            return new Artifact
+            {
+                Id = Guid.NewGuid().ToString(),
+                Position = selectedPosition,
+                MainStat = selectedMainStat,
+                SubStats = substatStrings,
+                Level = 0,
+                SelectedSubstatsUpgradedCount = 0,
+                Source = ArtifactSource.Customized,
+                SelectedSubstats = new List<string>(selectedSubstatNames) // 保存最初选中的2条
+            };
+        }
 
     }
 }

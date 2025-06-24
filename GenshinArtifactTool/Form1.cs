@@ -5,6 +5,7 @@ using System.Linq;
 using GenshinArtifactTool;
 using System.Windows.Forms;
 using static GenshinArtifactTool.ArtifactBrushForm;
+using static GenshinArtifactTool.Artifact;
 
 namespace GenshinArtifactTool
 {
@@ -13,13 +14,14 @@ namespace GenshinArtifactTool
     /// </summary>
     public partial class Form1 : Form
     {
+        public static ArtifactDataManager DataManager => ArtifactDataManager.Instance;
         // 功能界面
         private ArtifactBrushForm artifactBrushForm;
         private ArtifactUpgradeForm artifactUpgradeForm;
-        
+        private string artifactId;
         private InventoryForm inventoryForm;
         public TabControl tabControl;
-       
+        public string _artifactId;
         // 主界面面板
         private Panel mainPanel;
         private Panel upgradePanel;
@@ -58,25 +60,75 @@ namespace GenshinArtifactTool
 
             // 订阅事件
             artifactBrushForm.UpgradeRequested += ArtifactBrushForm_UpgradeRequested;
+
+            // 订阅升级完成事件
+            artifactUpgradeForm.UpgradeCompleted += (artifact) =>
+            {
+                // 更新数据管理器中的圣遗物
+                ArtifactDataManager.Instance.UpdateArtifact(artifact);
+
+                // 刷新背包显示
+                if (inventoryForm != null)
+                {
+                    inventoryForm.RefreshArtifacts();
+                }
+            };
         }
         private void ArtifactBrushForm_UpgradeRequested(object sender, UpgradeRequestedEventArgs e)
         {
             if (artifactUpgradeForm != null)
             {
-                artifactUpgradeForm.SetArtifactData(e.Position, e.MainStat, e.SubStats);
+                // 创建完整的Artifact对象（包含来源信息）
+                var artifact = new Artifact
+                {
+                    Id = e.Id,
+                    Position = e.Position,
+                    MainStat = e.MainStat,
+                    SubStats = e.SubStats,
+                    Level = 0, // 初始等级为0
+                    Source = ArtifactSource.Dropped, // 刷本掉落的圣遗物
+                    SelectedSubstats = new List<string>() // 普通圣遗物没有预选副词条
+                };
+
+                // 传递完整的Artifact对象
+                artifactUpgradeForm.SetArtifactData(artifact);
+
+                // 订阅升级完成事件
+                artifactUpgradeForm.UpgradeCompleted += (upgradedArtifact) =>
+                {
+                    // 更新数据管理器
+                    ArtifactDataManager.Instance.UpdateArtifact(upgradedArtifact);
+
+                    // 刷新背包显示
+                    if (inventoryForm != null && !inventoryForm.IsDisposed)
+                    {
+                        inventoryForm.RefreshArtifacts();
+                    }
+                };
+
                 SwitchToTab("圣遗物升级");
             }
         }
-        public void ShowArtifactUpgrade(string position, string mainStat, List<string> subStats)
+
+
+        // 修改 ShowArtifactUpgrade 方法，接收并传递圣遗物 ID
+        public void ShowArtifactUpgrade(Artifact artifact)
         {
             // 确保升级窗体已初始化
             if (artifactUpgradeForm == null || artifactUpgradeForm.IsDisposed)
             {
-                artifactUpgradeForm = new ArtifactUpgradeForm(position, mainStat, subStats)
+                artifactUpgradeForm = new ArtifactUpgradeForm
                 {
                     TopLevel = false,
                     FormBorderStyle = FormBorderStyle.None,
                     Dock = DockStyle.Fill
+                };
+
+                // 订阅升级完成事件（使用不同的参数名）
+                artifactUpgradeForm.UpgradeCompleted += (upgradedArtifact) =>
+                {
+                    ArtifactDataManager.Instance.UpdateArtifact(upgradedArtifact);
+                    inventoryForm?.RefreshArtifacts();
                 };
 
                 // 添加到TabPage
@@ -84,11 +136,9 @@ namespace GenshinArtifactTool
                 tabPage.Controls.Add(artifactUpgradeForm);
                 tabControl.TabPages.Add(tabPage);
             }
-            else
-            {
-                // 更新现有窗体数据
-                artifactUpgradeForm.SetArtifactData(position, mainStat, subStats);
-            }
+
+            // 传递圣遗物数据
+            artifactUpgradeForm.SetArtifactData(artifact);
 
             // 切换到升级标签页
             SwitchToTab("圣遗物升级");
@@ -131,7 +181,7 @@ namespace GenshinArtifactTool
             artifactBrushForm.SetInventoryForm(inventoryForm); // 通过公共方法设置InventoryForm引用
 
             // 其他窗体初始化...
-            artifactUpgradeForm = new ArtifactUpgradeForm("", "", new List<string>())
+            artifactUpgradeForm = new ArtifactUpgradeForm("", "", "", new List<string>())
             {
                 TopLevel = false,
                 FormBorderStyle = FormBorderStyle.None
@@ -338,13 +388,15 @@ namespace GenshinArtifactTool
                 if (artifactsListBox.SelectedIndex < 0) return;
 
                 string selectedText = artifactsListBox.SelectedItem.ToString();
-                // 使用字符串数组作为分隔符
                 string[] parts = selectedText.Split(new[] { " - " }, StringSplitOptions.None);
 
                 if (parts.Length >= 2)
                 {
-                    currentPosition = parts[0].Trim();
-                    currentMainStat = parts[1].Trim();
+                    // 假设格式为 "ID - 部位 - 主词条"
+                    _artifactId = parts[0].Trim(); // 第一部分作为ID
+                    currentPosition = parts[1].Trim();
+                    currentMainStat = parts[2].Trim();
+
                     InitializeSubStats();
                 }
             }
@@ -363,25 +415,25 @@ namespace GenshinArtifactTool
         {
             // 升级所需摩拉
             upgradeCosts = new int[] {
-                0, 2000, 4000, 6000, 8000,
-                12000, 16000, 20000, 24000, 30000,
-                36000, 42000, 50000, 60000, 70000,
-                80000, 90000, 100000, 120000, 150000
+            3000, 3728, 4422, 5150,    // 0-4级
+            5900, 6675, 7500, 8350, 9225, // 5-9级
+            10125, 11050, 12025, 13025, 15150, // 10-14级
+            17600, 20375, 23500, 27050, 31050,35575 // 15-20级
             };
 
             // 副词条提升值
             statImprovements = new Dictionary<string, float[]>()
             {
-                { "攻击力百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
-                { "防御力百分比", new float[] { 5.1f, 5.8f, 6.6f, 7.3f } },
-                { "生命值百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
-                { "元素充能效率", new float[] { 4.5f, 5.2f, 5.8f, 6.5f } },
-                { "元素精通", new float[] { 16, 19, 21, 23 } },
-                { "暴击率", new float[] { 2.7f, 2.1f, 2.5f, 2.8f } },
-                { "暴击伤害", new float[] { 5.4f, 6.2f, 7.0f, 7.8f } },
-                { "攻击力", new float[] { 14, 16, 18, 19 } },
-                { "防御力", new float[] { 16, 19, 21, 23 } },
-                { "生命值", new float[] { 209, 239, 269, 299 } }
+            { "攻击力百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
+            { "防御力百分比", new float[] { 5.1f, 5.8f, 6.6f, 7.3f } },
+            { "生命值百分比", new float[] { 4.1f, 4.7f, 5.3f, 5.8f } },
+            { "元素充能效率", new float[] { 4.5f, 5.2f, 5.8f, 6.5f } },
+            { "元素精通", new float[] { 16, 19, 21, 23 } },
+            { "暴击率", new float[] { 2.7f, 3.1f, 3.5f, 3.9f } },
+            { "暴击伤害", new float[] { 5.4f, 6.2f, 7.0f, 7.8f } },
+            { "攻击力", new float[] { 14, 16, 18, 19 } },
+            { "防御力", new float[] { 16, 19, 21, 23 } },
+            { "生命值", new float[] { 209, 239, 269, 299 } }
             };
 
             subStatValues = new List<float>();
@@ -416,6 +468,7 @@ namespace GenshinArtifactTool
                 }
                 else
                 {
+                    MessageBox.Show($"未找到 {stat} 的初始值数据", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     subStatValues.Add(0);
                     subStatUpgradeLevels.Add(0);
                 }
@@ -495,22 +548,28 @@ namespace GenshinArtifactTool
         private void UpgradeButton_Click(object sender, EventArgs e)
         {
             GetSelectedArtifactData();
-            if (string.IsNullOrEmpty(currentPosition))
+            if (string.IsNullOrEmpty(currentPosition) || string.IsNullOrEmpty(_artifactId))
             {
-                MessageBox.Show("请先选择一个圣遗物", "提示");
+                MessageBox.Show("请先选择一个有效的圣遗物", "提示");
                 return;
             }
 
-            // 切换到标签页（确保TabControl可见）
+            // 创建完整的Artifact对象
+            var artifact = new Artifact
+            {
+                Id = _artifactId,
+                Position = currentPosition.Trim(),
+                MainStat = currentMainStat.Trim(),
+                SubStats = currentSubStats ?? new List<string>(),
+                Level = 0, // 初始等级设为0
+                Source = ArtifactSource.Dropped, // 默认作为刷本掉落的圣遗物
+                SelectedSubstats = new List<string>() // 普通圣遗物没有预选副词条
+            };
 
-           
+            // 传递完整的Artifact对象
+            artifactUpgradeForm.SetArtifactData(artifact);
 
-            // 传递数据给升级界面
-            artifactUpgradeForm.SetArtifactData(
-                currentPosition.Trim(),  // 注意添加Trim()去除空格
-                currentMainStat.Trim(),
-                currentSubStats
-            );
+            SwitchToTab("圣遗物升级");
         }
 
         private void InitializeUpgradeUI()
@@ -681,29 +740,6 @@ namespace GenshinArtifactTool
 
             form.Show();
         }
-
-
-
-        // 在Form1类中添加这个方法
-        public void SetArtifactData(string position, string mainStat, List<string> subStats)
-        {
-            // 确保artifactUpgradeForm已初始化
-            if (artifactUpgradeForm == null)
-            {
-                artifactUpgradeForm = new ArtifactUpgradeForm(position, mainStat, subStats);
-                AddFormToTabPage(artifactUpgradeForm, "圣遗物升级");
-            }
-            else
-            {
-                // 更新现有窗体的数据
-                artifactUpgradeForm.SetArtifactData(position, mainStat, subStats);
-            }
-
-            // 切换到升级标签页
-     
-        }
-        // 刷圣遗物按钮点击事件
-        // 刷圣遗物按钮点击事件
 
 
         // 圣遗物升级按钮点击事件

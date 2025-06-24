@@ -1,12 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
+using static GenshinArtifactTool.Artifact;
+using System.Linq;
+using static System.Windows.Forms.AxHost;
 
 namespace GenshinArtifactTool
 {
     public partial class ArtifactUpgradeForm : Form
     {
+        private int _selectedSubstatsUpgradedCount = 0;
+        public event Action<Artifact> UpgradeCompleted;
+        public Action<Artifact> OnUpgradeComplete { get; set; }
+        private ArtifactSource _artifactSource;
+        private List<string> _selectedSubstats = new List<string>();
+        // 当前圣遗物的 ID
+        private string _artifactId;
+
         public Form1 MainForm { get; set; }
         // 圣遗物部位类型
         private readonly string[] artifactPositions = { "时之沙", "死之羽", "生之花", "空之杯", "理之冠" };
@@ -65,7 +77,6 @@ namespace GenshinArtifactTool
         {
             try
             {
-                // 直接从资源获取（避免反射问题）
                 switch (position)
                 {
                     case "生之花":
@@ -88,21 +99,30 @@ namespace GenshinArtifactTool
                 return null;
             }
         }
-        public ArtifactUpgradeForm(string position, string mainStat, List<string> subStats)
+        public ArtifactUpgradeForm(string artifactId, string position, string mainStat, List<string> subStats)
         {
             InitializeComponent();
             InitializeUI();
-            LoadArtifactImages(); // 加载图片资源
+            LoadArtifactImages();
 
-            // 初始化数据
+            _artifactId = artifactId;
             _position = position;
             _mainStat = mainStat;
-            _subStats = new List<string>(subStats);
+            _subStats = subStats;
 
-            InitializeSubStats();
-            UpdateUI();
-            SetArtifactImage(position); // 设置图片
+            // 确保_subStats有数据再进行操作
+            if (_subStats != null && _subStats.Count > 0)
+            {
+                UpdateUI();
+                SetArtifactImage(position);
+            }
+            else
+            {
+                MessageBox.Show("圣遗物副词条数据无效", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
+
         private void SetArtifactImage(string position)
         {
             if (artifactImages.ContainsKey(position))
@@ -399,32 +419,53 @@ namespace GenshinArtifactTool
         // 更新UI显示
         private void UpdateUI()
         {
-            // 更新副词条列表
-            lstSubStats.Items.Clear();
-            for (int i = 0; i < _subStats.Count; i++)
+            try
             {
-                string stat = _subStats[i];
-                float value = _subStatValues[i];
-                int upgradeLevel = _subStatUpgradeLevels[i];
+                // 清空列表
+                lstSubStats.Items.Clear();
 
-                string unit = _statUnits.ContainsKey(stat) ? _statUnits[stat] : "";
-                string displayValue = $"{Math.Round(value, 1)}{unit}";
+                // 安全更新副词条列表
+                int minCount = Math.Min(
+                    Math.Min(_subStats.Count, _subStatValues.Count),
+                    _subStatUpgradeLevels.Count
+                );
 
-                string upgradeMark = upgradeLevel > 0 ? $" (+{upgradeLevel}次强化)" : "";
-                bool isNewlyAdded = upgradeLevel == 0 && _subStats.Count > 4;
-                string newMark = isNewlyAdded ? " [新解锁]" : "";
+                for (int i = 0; i < minCount; i++)
+                {
+                    string stat = _subStats[i];
+                    float value = _subStatValues[i];
+                    int upgradeLevel = _subStatUpgradeLevels[i];
 
-                lstSubStats.Items.Add($"{stat}: {displayValue}{upgradeMark}{newMark}");
+                    string unit = _statUnits.TryGetValue(stat, out var u) ? u : "";
+                    string displayValue = unit == "%" ? $"{value:F1}{unit}" : $"{(int)value}{unit}";
+
+                    string upgradeMark = upgradeLevel > 0 ? $" (+{upgradeLevel}次强化)" : "";
+                    bool isNewlyAdded = upgradeLevel == 0 && _subStats.Count > 4;
+                    string newMark = isNewlyAdded ? " [新解锁]" : "";
+
+                    lstSubStats.Items.Add($"{stat}: {displayValue}{upgradeMark}{newMark}");
+                }
+
+                // 处理可能的缺失数据
+                if (_subStats.Count > minCount)
+                {
+                    Debug.WriteLine($"警告: 有{_subStats.Count - minCount}个副词条没有对应数值");
+                }
+
+                // 更新其他UI元素
+                lblPosition.Text = _position ?? "未知部位";
+                lblLevel.Text = $"等级: +{Math.Max(0, _currentLevel)}";
+                lblMainStat.Text = $"主词条: {_mainStat ?? "未知"}";
+                pbUpgrade.Value = Math.Min(pbUpgrade.Maximum, Math.Max(0, _currentLevel));
+
+                UpdateUpgradeCost();
             }
-
-            // 更新其他显示文本
-            lblPosition.Text = _position;
-            lblLevel.Text = $"等级: +{_currentLevel}";
-            lblMainStat.Text = $"主词条: {_mainStat}";
-            pbUpgrade.Value = _currentLevel;
-
-            // 更新升级成本
-            UpdateUpgradeCost();
+            catch (Exception ex)
+            {
+                MessageBox.Show($"更新UI时出错: {ex.Message}", "错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Debug.WriteLine($"UI更新错误: {ex}");
+            }
         }
 
         private void UpdateUpgradeCost()
@@ -456,46 +497,44 @@ namespace GenshinArtifactTool
             btnUpgradeMax.Enabled = true;
         }
 
-        private void InitializeSubStats()
-        {
-            _subStatValues.Clear();
-            _subStatUpgradeLevels.Clear();
 
-            // 重新初始化可用副词条池
-            _availableSubstats = new List<string>(_statImprovements.Keys);
-            _availableSubstats.Remove(_mainStat);
-
-            foreach (string stat in _subStats)
-            {
-                if (_statImprovements.ContainsKey(stat))
-                {
-                    float[] possibleValues = _statImprovements[stat];
-                    int randomIndex = _random.Next(possibleValues.Length);
-                    float value = possibleValues[randomIndex];
-
-                    _subStatValues.Add((float)Math.Round(value, 1));
-                    _subStatUpgradeLevels.Add(0);
-
-                    _availableSubstats.Remove(stat);
-                }
-            }
-        }
 
         private void BtnUpgrade_Click(object sender, EventArgs e)
         {
-            if (_currentLevel >= _maxLevel)
-            {
-                MessageBox.Show("圣遗物已达到最大等级，无法继续升级！", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
+            if (_currentLevel >= _maxLevel) return;
 
-            // 安全升级，不超过最大等级
             _currentLevel = Math.Min(_currentLevel + 1, _maxLevel);
             ProcessLevelUp();
             UpdateUI();
-        }
 
+            var upgradedArtifact = new Artifact
+            {
+                Id = _artifactId,
+                Position = _position,
+                MainStat = _mainStat,
+                SubStats = GetFormattedSubStats(),
+                Level = _currentLevel,
+                Source = _artifactSource,
+                SelectedSubstats = _selectedSubstats,
+                SelectedSubstatsUpgradedCount = _selectedSubstatsUpgradedCount
+            };
+
+            UpgradeCompleted?.Invoke(upgradedArtifact);
+            ArtifactDataManager.Instance.UpdateArtifact(upgradedArtifact);
+        }
+        private List<string> GetFormattedSubStats()
+        {
+            var result = new List<string>();
+            for (int i = 0; i < _subStats.Count; i++)
+            {
+                string stat = _subStats[i];
+                float value = _subStatValues[i];
+                string unit = _statUnits.TryGetValue(stat, out var u) ? u : "";
+                string displayValue = unit == "%" ? $"{value:F1}{unit}" : $"{(int)value}{unit}";
+                result.Add($"{stat}: {displayValue}");
+            }
+            return result;
+        }
         private void BtnUpgrade4_Click(object sender, EventArgs e)
         {
             if (_currentLevel >= _maxLevel) return;
@@ -504,9 +543,32 @@ namespace GenshinArtifactTool
             int maxUpgrade = _maxLevel - _currentLevel;
             int upgradeCount = Math.Min(4, maxUpgrade);
 
-            _currentLevel += upgradeCount;
-            ProcessLevelUp();
+            for (int i = 0; i < upgradeCount; i++)
+            {
+                _currentLevel++;
+                ProcessLevelUp();
+            }
+
             UpdateUI();
+
+            // 创建升级后的圣遗物对象并触发事件
+            var upgradedArtifact = new Artifact
+            {
+                Id = _artifactId,
+                Position = _position,
+                MainStat = _mainStat,
+                SubStats = GetFormattedSubStats(),
+                SelectedSubstatsUpgradedCount = _selectedSubstatsUpgradedCount,
+                Source = _artifactSource, // 保留原始来源
+                SelectedSubstats = _selectedSubstats, // 保留自选属性
+                Level = _currentLevel
+            };
+
+            // 触发升级完成事件
+            UpgradeCompleted?.Invoke(upgradedArtifact);
+
+            // 更新数据管理器中的圣遗物
+            ArtifactDataManager.Instance.UpdateArtifact(upgradedArtifact);
         }
 
         // 升满级按钮点击事件
@@ -514,15 +576,141 @@ namespace GenshinArtifactTool
         {
             if (_currentLevel >= _maxLevel) return;
 
-            // 逐步升级到满级，确保每个等级的逻辑都被处理
-            while (_currentLevel < _maxLevel)
+            btnUpgradeMax.Enabled = false;
+
+            try
             {
-                _currentLevel++;
-                ProcessLevelUp();
+                int startLevel = _currentLevel;
+
+                for (int targetLevel = startLevel + 1; targetLevel <= _maxLevel; targetLevel++)
+                {
+                    _currentLevel = targetLevel;
+                    ProcessLevelUp();
+                }
+
+                UpdateUI();
+
+                // 创建升级后的圣遗物对象
+                var upgradedArtifact = new Artifact
+                {
+                    Id = _artifactId,
+                    Position = _position,
+                    MainStat = _mainStat,
+                    SubStats = GetFormattedSubStats(),
+                    Source = _artifactSource, // 保留原始来源
+                    SelectedSubstats = _selectedSubstats, // 保留自选属性
+                    SelectedSubstatsUpgradedCount = _selectedSubstatsUpgradedCount,
+                    Level = _currentLevel
+                };
+
+                // 触发升级完成事件
+                UpgradeCompleted?.Invoke(upgradedArtifact);
+
+                // 更新数据管理器中的圣遗物
+                ArtifactDataManager.Instance.UpdateArtifact(upgradedArtifact);
             }
-            UpdateUI();
+            finally
+            {
+                btnUpgradeMax.Enabled = true;
+            }
+
         }
 
+
+        // 处理升级过程
+        private void ProcessLevelUp()
+        {
+            // 3词条圣遗物首次到+4级时优先添加新词条
+            if (_subStats.Count == 3 && _currentLevel == 4)
+            {
+                ExpandSubstatWithRandomValue(false);
+                return; // 跳过本次强化
+            }
+
+            // 每4级强化一次
+            if (_currentLevel % 4 == 0 && _currentLevel <= 20)
+            {
+                if (_artifactSource == ArtifactSource.Customized &&
+                    _selectedSubstats.Count > 0 &&
+                    _selectedSubstatsUpgradedCount < 2)
+                {
+                    // 祝圣之霜圣遗物优先强化自选副词条（总共至少2次）
+                    EnhanceSelectedSubstats();
+                }
+                else
+                {
+                    // 普通圣遗物随机强化
+                    EnhanceRandomSubstat();
+                }
+            }
+        }
+        private void EnhanceSelectedSubstats()
+        {
+            if (_selectedSubstats.Count == 0) return;
+
+            // 随机选择一条自选副词条
+            int selectedIndex = _random.Next(_selectedSubstats.Count);
+            string substat = _selectedSubstats[selectedIndex];
+
+            if (_statImprovements.TryGetValue(substat, out float[] improvements))
+            {
+                // 找到对应的副词条索引
+                int statIndex = _subStats.FindIndex(s => s == substat);
+                if (statIndex >= 0)
+                {
+                    float gain = improvements[_random.Next(improvements.Length)];
+                    _subStatValues[statIndex] += gain;
+                    _subStatUpgradeLevels[statIndex]++;
+                    _selectedSubstatsUpgradedCount++;
+
+                    Debug.WriteLine($"强化自选副词条: {substat} (+{gain}) 总强化次数: {_selectedSubstatsUpgradedCount}/2");
+                }
+            }
+        }
+        private void ExpandSubstatWithRandomValue(bool showPrompt = true)
+        {
+            if (_availableSubstats.Count == 0) return;
+
+            int index = _random.Next(_availableSubstats.Count);
+            string newStat = _availableSubstats[index];
+            float[] possibleValues = _statImprovements[newStat];
+            float randomValue = possibleValues[_random.Next(possibleValues.Length)];
+
+            _subStats.Add(newStat);
+            _subStatValues.Add(randomValue);
+            _subStatUpgradeLevels.Add(0);
+            _availableSubstats.RemoveAt(index);
+
+            if (showPrompt)
+            {
+                string unit = _statUnits[newStat];
+                string valueStr = unit == "%" ? $"{randomValue:F1}{unit}" : $"{(int)randomValue}{unit}";
+               
+            }
+        }
+        private void EnhanceRandomSubstat(bool showPrompt = true)
+        {
+            if (_subStats.Count == 0) return;
+
+            int statIndex = _random.Next(_subStats.Count);
+            string stat = _subStats[statIndex];
+
+            if (_statImprovements.TryGetValue(stat, out float[] improvements))
+            {
+                // 随机选择一个强化值（包含最低档）
+                float gain = improvements[_random.Next(improvements.Length)];
+
+                _subStatValues[statIndex] += gain;
+                _subStatUpgradeLevels[statIndex]++;
+
+                if (showPrompt)
+                {
+                    string unit = _statUnits[stat];
+                    string valueStr = unit == "%" ? $"{gain:F1}{unit}" : $"+{(int)gain}{unit}";
+                    
+                }
+            }
+        }
         private void ExpandSubstat(bool showPrompt = true)
         {
             if (_availableSubstats.Count == 0) return;
@@ -530,110 +718,161 @@ namespace GenshinArtifactTool
             int index = _random.Next(_availableSubstats.Count);
             string newStat = _availableSubstats[index];
 
-            // 添加新词条
+            // 添加新词条（取该词条的最低档数值）
+            float[] possibleValues = _statImprovements[newStat];
+            float baseValue = possibleValues[0]; // 取最小值作为初始值
+
             _subStats.Add(newStat);
-
-            // 初始化词条值（直接使用预设值）
-            if (_statImprovements.ContainsKey(newStat))
-            {
-                float[] possibleValues = _statImprovements[newStat];
-                int randomIndex = _random.Next(possibleValues.Length);
-                float value = possibleValues[randomIndex];
-                _subStatValues.Add((float)Math.Round(value, 1));
-            }
-            else
-            {
-                _subStatValues.Add(0);
-            }
-
+            _subStatValues.Add(baseValue);
             _subStatUpgradeLevels.Add(0);
             _availableSubstats.RemoveAt(index);
 
             if (showPrompt)
             {
-                MessageBox.Show($"恭喜！圣遗物解锁了新的副词条: {newStat}！", "圣遗物升级",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"解锁新副词条: {newStat} +{baseValue}{_statUnits[newStat]}",
+                    "圣遗物升级", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+            Debug.WriteLine($"新增词条: {newStat} 初始值: {baseValue}");
+            
         }
 
-        private void EnhanceSubstat(bool showPrompt = true)
+
+        public void SetArtifactData(Artifact artifact)
         {
-            int statIndex = _random.Next(_subStats.Count);
-            string statToUpgrade = _subStats[statIndex];
 
-            if (_statImprovements.ContainsKey(statToUpgrade))
+            _availableSubstats = new List<string>(_statImprovements.Keys);
+            _artifactId = artifact.Id;
+            _position = artifact.Position;
+            _mainStat = artifact.MainStat;
+            _artifactSource = artifact.Source;
+            _selectedSubstats = artifact.SelectedSubstats ?? new List<string>();
+            _selectedSubstatsUpgradedCount = artifact.SelectedSubstatsUpgradedCount;
+            _currentLevel = artifact.Level;
+
+            // 解析副词条数据
+            _subStats = new List<string>();
+            _subStatValues = new List<float>();
+            _subStatUpgradeLevels = new List<int>();
+            if (_subStats != null && _mainStat != null)
             {
-                float[] improvements = _statImprovements[statToUpgrade];
-                float improvement = improvements[_random.Next(improvements.Length)];
-
-                _subStatValues[statIndex] += improvement;
-                _subStatUpgradeLevels[statIndex]++;
-
-                // 显示强化提示
-                if (showPrompt)
+                _availableSubstats.RemoveAll(s => _subStats.Contains(s) || s == _mainStat);
+            }
+            else
+            {
+                // 处理意外情况
+                if (_subStats == null)
                 {
-                    MessageBox.Show($"恭喜！副词条 {statToUpgrade} 获得强化！", "圣遗物升级",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Debug.WriteLine("警告: _subStats 为 null");
+                    _subStats = new List<string>();
+                }
+                if (_mainStat == null)
+                {
+                    Debug.WriteLine("警告: _mainStat 为 null");
+                    _mainStat = string.Empty;
+                }
+                InitializeAvailableSubstats();
+            }
+            foreach (var statStr in artifact.SubStats)
+            {
+                var parts = statStr.Split(new[] { ':' }, 2);
+                if (parts.Length == 2)
+                {
+                    string statName = parts[0].Trim();
+                    string valueStr = parts[1].Trim();
+
+                    if (float.TryParse(valueStr.Replace("%", ""), out float value))
+                    {
+                        _subStats.Add(statName);
+                        _subStatValues.Add(value);
+                        _subStatUpgradeLevels.Add(0);
+                    }
                 }
             }
-        }
 
-        // 处理升级过程
-        private void ProcessLevelUp()
-        {
-            // 检查是否需要扩展副词条
-            if (_subStats.Count == 3 && IsLevelForExpansion(_currentLevel))
-            {
-                ExpandSubstat(false);
-            }
-            // 每4级有几率提升副词条（包括所有4的倍数等级）
-            else if (_currentLevel % 4 == 0 && _subStats.Count > 0)
-            {
-                EnhanceSubstat(false);
-            }
-        }
-
-        public void SetArtifactData(string position, string mainStat, List<string> subStats)
-        {
-            // 确保UI已初始化
-            if (mainLayoutPanel == null)
-            {
-                InitializeUI();
-                LoadArtifactImages(); // 加载图片资源
-            }
-
-            // 重置所有相关变量
-            _position = position;
-            _mainStat = mainStat;
-            _subStats = new List<string>(subStats);
-            _currentLevel = 0;
-
-            // 重置副词条数据
-            InitializeSubStats();
-
-            // 更新UI
             UpdateUI();
-
-            // 重置进度条
-            pbUpgrade.Value = 0;
-
-            // 启用按钮
-            btnUpgrade.Enabled = true;
-            btnUpgrade4.Enabled = true;
-            btnUpgradeMax.Enabled = true;
-            btnUpgrade.Text = "升级";
-
-            // 更新窗口标题
-            this.Text = $"升级 {position}";
-
-            // 设置图片
-            SetArtifactImage(position);
+            SetArtifactImage(_position);
         }
 
+        private void InitializeAvailableSubstats()
+        {
+            try
+            {
+                // 确保基础数据已加载
+                if (_statImprovements == null || _statImprovements.Count == 0)
+                {
+                    Debug.WriteLine("错误: _statImprovements 未初始化");
+                    return;
+                }
+
+                // 创建新的列表
+                _availableSubstats = new List<string>(_statImprovements.Keys);
+
+                // 安全移除 - 使用普通循环替代LINQ
+                for (int i = _availableSubstats.Count - 1; i >= 0; i--)
+                {
+                    string s = _availableSubstats[i];
+                    if ((_subStats != null && _subStats.Contains(s)) ||
+                        (!string.IsNullOrEmpty(_mainStat) && s == _mainStat))
+                    {
+                        _availableSubstats.RemoveAt(i);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"初始化可用副词条时出错: {ex.Message}");
+                _availableSubstats = new List<string>();
+            }
+        }
+        private void UpdateArtifactInManager()
+        {
+            if (!string.IsNullOrEmpty(_artifactId))
+            {
+                var updatedArtifact = new Artifact
+                {
+                    Id = _artifactId,
+                    Position = _position,
+                    MainStat = _mainStat,
+                    SubStats = new List<string>()
+                };
+
+                // 构建更新后的副词条数据
+                for (int i = 0; i < _subStats.Count; i++)
+                {
+                    string stat = _subStats[i].Split(':')[0].Trim();
+                    float value = _subStatValues[i];
+                    string unit = GetStatUnit(stat);
+                    string displayValue = $"{value}{unit}";
+                    int upgradeLevel = _subStatUpgradeLevels[i];
+                    string upgradeMark = upgradeLevel > 0 ? $" (+{upgradeLevel}次强化)" : "";
+                    updatedArtifact.SubStats.Add($"{stat}: {displayValue}{upgradeMark}");
+                }
+
+                ArtifactDataManager.Instance.UpdateArtifact(updatedArtifact);
+            }
+        }
+        private string GetStatUnit(string stat)
+        {
+            switch (stat)
+            {
+                case "攻击力百分比":
+                case "防御力百分比":
+                case "生命值百分比":
+                case "元素充能效率":
+                case "暴击率":
+                case "暴击伤害":
+                    return "%";
+                default:
+                    return "";
+            }
+        }
         // 检查是否是扩展词条的等级
         private bool IsLevelForExpansion(int level)
         {
+            // 4/8/12/16级时扩展副词条
             return level == 4 || level == 8 || level == 12 || level == 16;
         }
+
+        
     }
 }

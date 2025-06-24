@@ -73,7 +73,17 @@ namespace GenshinArtifactTool
             artifactSelectionForm = new ArtifactSelectionForm();
             artifactSelectionForm.TopLevel = false;
             artifactSelectionForm.FormBorderStyle = FormBorderStyle.None;
+            artifactUpgradeForm.UpgradeCompleted += (artifact) =>
+            {
+                // 更新数据管理器中的圣遗物
+                ArtifactDataManager.Instance.UpdateArtifact(artifact);
 
+                // 刷新背包显示
+                if (inventoryForm != null)
+                {
+                    inventoryForm.RefreshArtifacts();
+                }
+            };
             // 其他窗体初始化...
         }
 
